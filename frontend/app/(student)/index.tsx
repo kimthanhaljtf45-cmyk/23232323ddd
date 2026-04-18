@@ -131,7 +131,159 @@ function HeroFighter({ user, junior, streak, attendance, rank }: any) {
   );
 }
 
-// X10 FINAL FIX: Behavior-driven primary CTA (priority: missed > streakBroken > today > schedule)
+// ── ADULT HOME blocks (self-management, not child-control) ────────
+function PrimaryCTAAdult({ training, adult, streak, attendance, onStart, onSchedule, onComeback }: any) {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const trainingDate = (training?.date || '').slice(0, 10);
+  const isToday = trainingDate && trainingDate === todayISO;
+
+  const missedLast = adult?.missedLastTraining || (attendance > 0 && attendance < 60);
+  const streakBroken = streak === 0 && (adult?.lastStreak || 0) >= 3;
+
+  if (missedLast) {
+    return (
+      <PressScale testID="adult-primary-cta" style={s.primaryCTACritical as any} onPress={onComeback || onSchedule}>
+        <View style={s.primaryCTAIcon}><Ionicons name="warning" size={22} color="#FFF" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Повернись до форми</Text>
+          <Text style={s.primaryCTASub}>⚠️ Пропуск відкинув тебе · не здавайся</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+  if (streakBroken) {
+    return (
+      <PressScale testID="adult-primary-cta" style={s.primaryCTAAmber as any} onPress={onSchedule}>
+        <View style={s.primaryCTAIcon}><Ionicons name="flame" size={22} color="#FFF" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Почати нову серію</Text>
+          <Text style={s.primaryCTASub}>🔥 Одне тренування — і ти знову в ритмі</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+  if (isToday) {
+    return (
+      <PressScale testID="adult-primary-cta" style={s.primaryCTAAdult as any} onPress={onStart}>
+        <View style={s.primaryCTAIcon}><Ionicons name="fitness" size={22} color="#FFF" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Піти на тренування</Text>
+          <Text style={s.primaryCTASub}>🥋 Сьогодні · {training?.startTime}–{training?.endTime}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+  return (
+    <PressScale testID="adult-primary-cta" style={s.primaryCTAAdult as any} onPress={onSchedule}>
+      <View style={s.primaryCTAIcon}><Ionicons name="calendar" size={22} color="#FFF" /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.primaryCTATitle}>Запланувати тренування</Text>
+        <Text style={s.primaryCTASub}>Обери свій ритм</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#FFF" />
+    </PressScale>
+  );
+}
+
+const ADULT_LEVELS: Record<string, { label: string; color: string }> = {
+  BEGINNER:     { label: 'Початковий', color: '#6B7280' },
+  INTERMEDIATE: { label: 'Середній',   color: '#7C3AED' },
+  ADVANCED:     { label: 'Просунутий', color: '#DB2777' },
+  EXPERT:       { label: 'Експерт',    color: '#0F0F10' },
+};
+
+function HeroAdult({ user, adult, streak, attendance }: any) {
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Учень';
+  const level = ADULT_LEVELS[adult?.level || 'BEGINNER'] || ADULT_LEVELS.BEGINNER;
+  const completed = adult?.trainingsCompleted || 0;
+
+  // Adult motivation — self-improvement focused (not competition)
+  let motivation = 'Ти керуєш своїм ростом';
+  if (streak >= 10) motivation = '🔥 Дисципліна рівня профі · серія ' + streak;
+  else if (streak >= 5) motivation = `🔥 Ти в ритмі — серія ${streak} тренувань`;
+  else if (streak >= 3) motivation = `💪 Послідовність = результат · ${streak} поспіль`;
+  else if (attendance >= 80) motivation = '💪 Стабільність на рівні — так тримати';
+  else if (completed > 20) motivation = 'Ти стаєш сильнішим з кожним тренуванням';
+  else if (completed > 0) motivation = 'Кожне тренування формує тебе';
+
+  // Adult pressure — different tone (self-accountability, not shame)
+  let pressure: string | null = null;
+  if (streak >= 5) {
+    pressure = `⚠️ Пропуск зруйнує серію з ${streak} тренувань`;
+  } else if (attendance > 0 && attendance < 70) {
+    pressure = `⚠️ Стабільність падає — час повернутися в ритм`;
+  }
+
+  return (
+    <View style={[s.hero, { borderLeftWidth: 4, borderLeftColor: level.color }]} testID="hero-adult">
+      <View style={s.heroTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.heroName}>{name}</Text>
+          <View style={s.heroMeta}>
+            <View style={[s.beltPill, { backgroundColor: `${level.color}1A`, borderColor: `${level.color}40` }]}>
+              <Ionicons name="fitness" size={11} color={level.color} />
+              <Text style={[s.beltPillT, { color: level.color }]}>Рівень · {level.label}</Text>
+            </View>
+          </View>
+          {adult?.goal && <Text style={s.heroGroup}>🎯 {adult.goal}</Text>}
+        </View>
+      </View>
+
+      <Text style={s.heroMotivation}>{motivation}</Text>
+      {pressure && <Text style={s.heroPressure}>{pressure}</Text>}
+
+      {/* 3 stat-cards (adult: без пояса/ранга, фокус на self-metrics) */}
+      <View style={s.statsRow}>
+        <View style={s.statCard}>
+          <Text style={s.statVal}>{attendance || 0}%</Text>
+          <Text style={s.statLbl}>Стабільність</Text>
+        </View>
+        <View style={s.statCard}>
+          <Text style={[s.statVal, { color: '#F59E0B' }]}>🔥{streak || 0}</Text>
+          <Text style={s.statLbl}>Серія</Text>
+        </View>
+        <View style={s.statCard}>
+          <Text style={s.statVal}>{completed}</Text>
+          <Text style={s.statLbl}>Тренувань</Text>
+        </View>
+        <View style={s.statCard}>
+          <Text style={[s.statVal, { color: '#10B981' }]}>{adult?.discipline || 0}</Text>
+          <Text style={s.statLbl}>Дисципліна</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function AdultGoalBlock({ adult, onSchedule }: any) {
+  if (!adult) return null;
+  const target = adult.monthlyTarget || 12;
+  const done = adult.monthlyDone || 0;
+  const remain = Math.max(0, target - done);
+  const pct = target > 0 ? Math.min(100, (done / target) * 100) : 0;
+  return (
+    <View style={s.section} testID="adult-goal">
+      <Text style={s.sectionLabel}>ЦІЛЬ МІСЯЦЯ</Text>
+      <View style={s.adultGoal}>
+        <View style={s.adultGoalHead}>
+          <Text style={s.adultGoalTitle}>
+            {remain > 0 ? `Ще ${remain} тренувань до цілі` : '🏆 Ціль місяця досягнута!'}
+          </Text>
+          <Text style={s.adultGoalCount}>{done}/{target}</Text>
+        </View>
+        <View style={s.beltBarBg}>
+          <View style={[s.beltBarFill, { width: `${pct}%`, backgroundColor: '#7C3AED' }]} />
+        </View>
+        <Text style={s.adultGoalHint}>
+          {remain > 0 ? `💪 Середній темп: ${Math.ceil(remain / Math.max(1, (30 - new Date().getDate())))} тренувань/тиждень` : 'Ти в топ-формі цього місяця'}
+        </Text>
+      </View>
+    </View>
+  );
+}
 function PrimaryCTABanner({ training, junior, streak, attendance, onConfirm, onSchedule, onComeback }: any) {
   const todayISO = new Date().toISOString().slice(0, 10);
   const trainingDate = (training?.date || '').slice(0, 10);
@@ -626,6 +778,29 @@ export default function StudentHome() {
           </FadeInUp>
         )}
 
+        {/* ADULT Home — self-management mode */}
+        {!isJunior && (
+          <>
+            <FadeInUp>
+              <PrimaryCTAAdult
+                training={training}
+                adult={data?.adult}
+                streak={streak}
+                attendance={attendance}
+                onStart={() => onAction('confirm_training')}
+                onSchedule={() => onAction('schedule')}
+                onComeback={() => onAction('schedule')}
+              />
+            </FadeInUp>
+            <FadeInUp delay={60}>
+              <HeroAdult user={user} adult={data?.adult} streak={streak} attendance={attendance} />
+            </FadeInUp>
+            <FadeInUp delay={120}>
+              <AdultGoalBlock adult={data?.adult} onSchedule={() => onAction('schedule')} />
+            </FadeInUp>
+          </>
+        )}
+
         {/* B. HERO бойца (только для Junior; Adult использует свой экран) */}
         {isJunior && (
           <FadeInUp delay={60}>
@@ -953,6 +1128,34 @@ const s = StyleSheet.create({
     shadowRadius: 16,
     elevation: 6,
   },
+  // Adult CTA — purple accent (self-mastery, not sport competition)
+  primaryCTAAdult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#7C3AED',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 16,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  // Adult goal block
+  adultGoal: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F1F4',
+  },
+  adultGoalHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 },
+  adultGoalTitle: { fontSize: 14, fontWeight: '800', color: '#0F0F10', flex: 1 },
+  adultGoalCount: { fontSize: 16, fontWeight: '900', color: '#7C3AED' },
+  adultGoalHint: { fontSize: 11, color: '#6B7280', marginTop: 8, fontWeight: '600' },
   primaryCTATitle: { color: '#FFF', fontSize: 16, fontWeight: '800' },
   primaryCTASub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600', marginTop: 2 },
 
