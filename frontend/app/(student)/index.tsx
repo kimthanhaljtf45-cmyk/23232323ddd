@@ -42,6 +42,15 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
   const pct = total > 0 ? Math.min(100, (completed / total) * 100) : 0;
   const remaining = Math.max(0, total - completed);
 
+  // X10 FIX: motivation line based on progress + streak
+  let motivation = 'Ти на правильному шляху';
+  if (remaining === 0) motivation = '🏆 Готовий до атестації!';
+  else if (pct >= 80) motivation = '🔥 Фінішна пряма — новий рівень близько!';
+  else if (pct >= 50) motivation = '💪 Вже більше половини до нового рівня';
+  else if (streak >= 5) motivation = `🔥 Серія ${streak} тренувань — так тримати!`;
+  else if (streak >= 3) motivation = `Ти на хвилі · ${streak} тренувань підряд`;
+  else if (completed > 0) motivation = 'Кожне тренування наближає апгрейд';
+
   return (
     <View style={s.hero} testID="hero-fighter">
       <View style={s.heroTop}>
@@ -63,11 +72,14 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
         </View>
       </View>
 
-      {/* Belt progress bar */}
+      {/* X10 FIX: Motivation line — "я стаю сильнішим", not counter */}
+      <Text style={s.heroMotivation} testID="hero-motivation">{motivation}</Text>
+
+      {/* Belt progress bar — upgrade framing */}
       <View style={s.beltProgress}>
         <View style={s.beltProgressHead}>
           <Text style={s.beltProgressLbl}>
-            До {nextBelt.label} поясу
+            {remaining > 0 ? `Ще ${remaining} тренувань → новий рівень` : 'Максимум досягнуто'}
           </Text>
           <Text style={s.beltProgressVal}>{completed}/{total}</Text>
         </View>
@@ -75,7 +87,7 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
           <View style={[s.beltBarFill, { width: `${pct}%`, backgroundColor: nextBelt.text === '#FFFFFF' ? '#0F0F10' : nextBelt.text }]} />
         </View>
         <Text style={s.beltProgressRemain}>
-          {remaining > 0 ? `Залишилось ${remaining} тренувань` : '🏆 Готовий до атестації!'}
+          {remaining > 0 ? `→ ${nextBelt.label} пояс` : '🏆 Час атестації!'}
         </Text>
       </View>
 
@@ -99,6 +111,41 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
         </View>
       </View>
     </View>
+  );
+}
+
+// X10 FIX: Primary CTA banner — ONE dominant action per screen
+function PrimaryCTABanner({ training, onConfirm, onSchedule }: any) {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const trainingDate = (training?.date || '').slice(0, 10);
+  const isToday = trainingDate && trainingDate === todayISO;
+
+  if (isToday) {
+    return (
+      <PressScale testID="primary-cta-banner" style={s.primaryCTA as any} onPress={onConfirm}>
+        <View style={s.primaryCTAIcon}>
+          <Ionicons name="checkmark-circle" size={22} color="#FFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Підтвердь тренування</Text>
+          <Text style={s.primaryCTASub}>🎯 Сьогодні · {training?.startTime}–{training?.endTime}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+  // No training today → schedule CTA
+  return (
+    <PressScale testID="primary-cta-banner" style={s.primaryCTA as any} onPress={onSchedule}>
+      <View style={s.primaryCTAIcon}>
+        <Ionicons name="calendar" size={22} color="#FFF" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.primaryCTATitle}>Записатися на тренування</Text>
+        <Text style={s.primaryCTASub}>Обери зручний час</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#FFF" />
+    </PressScale>
   );
 }
 
@@ -422,9 +469,16 @@ export default function StudentHome() {
           // Sprint 3 MUST: apply XP to real backend
           const xpRes: any = await api.post('/student/xp/apply', { source: 'training_confirm' }).catch(() => null);
           const delta = xpRes?.data?.delta || xpRes?.delta || 5;
-          // X10 Behavior: XP animation + success toast (instead of Alert)
+          // X10 FIX: Connect XP to growth — "+5 XP · Ще N XP до рівня"
+          const currentXp = (data?.gamification?.xp || data?.junior?.xp || 0) + delta;
+          const toNextLevel = 100 - (currentXp % 100);
           setXpPop({ visible: true, xp: delta });
-          setToast({ visible: true, text: '🔥 Ти молодець! Тренер отримав сповіщення', tone: 'success', icon: 'checkmark-circle' });
+          setToast({
+            visible: true,
+            text: `🔥 Ти молодець! +${delta} XP · Ще ${toNextLevel} XP до рівня`,
+            tone: 'success',
+            icon: 'checkmark-circle',
+          });
           fetchData();
         } catch {
           setToast({ visible: true, text: 'Не вдалося підтвердити. Спробуйте ще раз', tone: 'info', icon: 'alert-circle' });
@@ -497,16 +551,27 @@ export default function StudentHome() {
           />
         }
       >
-        {/* B. HERO бойца (только для Junior; Adult использует свой экран) */}
+        {/* X10 FIX: Primary CTA banner — ONE dominant action */}
         {isJunior && (
           <FadeInUp>
+            <PrimaryCTABanner
+              training={training}
+              onConfirm={() => onAction('confirm_training')}
+              onSchedule={() => onAction('schedule')}
+            />
+          </FadeInUp>
+        )}
+
+        {/* B. HERO бойца (только для Junior; Adult использует свой экран) */}
+        {isJunior && (
+          <FadeInUp delay={60}>
             <HeroFighter user={user} junior={junior} streak={streak} attendance={attendance} />
           </FadeInUp>
         )}
 
-        {/* Group Rank pill (Junior mini-leaderboard) */}
+        {/* Group Rank pill (Junior mini-leaderboard) — X10: "→ #N" pressure */}
         {isJunior && rank?.position != null && (
-          <FadeInUp delay={80}>
+          <FadeInUp delay={120}>
             <PressScale
               testID="group-rank-pill"
               style={s.rankPill as any}
@@ -515,11 +580,18 @@ export default function StudentHome() {
               <View style={s.rankIcon}>
                 <Ionicons name="trophy" size={16} color="#F59E0B" />
               </View>
-              <Text style={s.rankT}>
-                Ви #{rank.position} у групі «{rank.groupName}»
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.rankT}>
+                  Ви #{rank.position} у групі «{rank.groupName}»
+                </Text>
+                {rank.position > 1 && (
+                  <Text style={s.rankNext}>
+                    → Ще 1 тренування → #{rank.position - 1}
+                  </Text>
+                )}
+              </View>
               {rank.clubPosition && rank.clubTotal > 0 && (
-                <Text style={s.rankSub}>· #{rank.clubPosition} у клубі</Text>
+                <Text style={s.rankSub}>#{rank.clubPosition} у клубі</Text>
               )}
             </PressScale>
           </FadeInUp>
@@ -756,6 +828,30 @@ const s = StyleSheet.create({
     marginTop: 12,
   },
 
+  // X10 FIX: Primary CTA banner — dominant action
+  primaryCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#E30613',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 16,
+    shadowColor: '#E30613',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  primaryCTAIcon: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  primaryCTATitle: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  primaryCTASub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600', marginTop: 2 },
+
   // Section wrapper — vertical rhythm 24
   section: { marginTop: 24 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
@@ -794,6 +890,8 @@ const s = StyleSheet.create({
   },
   beltPillT: { fontSize: 12, fontWeight: '700' },
   heroGroup: { fontSize: 13, color: '#6B7280', marginTop: 6 },
+  // X10 FIX: motivation line in hero
+  heroMotivation: { fontSize: 13, color: '#0F0F10', fontWeight: '700', marginTop: 12, lineHeight: 18 },
 
   beltProgress: { marginTop: 16 },
   beltProgressHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -823,17 +921,14 @@ const s = StyleSheet.create({
   eventBtn: { backgroundColor: '#0F0F10', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   eventBtnText: { fontSize: 13, fontWeight: '700', color: '#FFF' },
 
-  // D. Training — Level 1 (bigger, bolder as per X10 review)
+  // D. Training — Level 2 (lighter shadow so Hero stays dominant)
   trainingCard: {
     backgroundColor: '#FFF',
     borderRadius: 18,
     padding: 18,
     marginTop: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F1F4',
   },
   tHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   tBadge: {
@@ -927,8 +1022,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rankT: { fontSize: 13, fontWeight: '700', color: '#92400E', flex: 1 },
-  rankSub: { fontSize: 12, color: '#B45309', fontWeight: '600' },
+  rankT: { fontSize: 13, fontWeight: '800', color: '#92400E' },
+  rankNext: { fontSize: 11, color: '#B45309', fontWeight: '700', marginTop: 2 },
+  rankSub: { fontSize: 11, color: '#B45309', fontWeight: '700' },
 
   // Skip flow
   skipSub: { fontSize: 13, color: '#6B7280', marginTop: 2, marginBottom: 10 },

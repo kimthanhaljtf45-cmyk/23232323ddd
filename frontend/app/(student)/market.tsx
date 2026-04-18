@@ -57,9 +57,11 @@ function SectionHeader({ icon, iconColor, title, subtitle }: any) {
   );
 }
 
-function ProductTile({ item, xp, onBuy, testID }: any) {
+function ProductTile({ item, xp, onBuy, testID, urgency }: any) {
   const discount = xp >= 50 ? Math.round((item.price || 0) * 0.05) : 0;
   const bought = socialProof(item);
+  // X10 FIX: context-specific urgency chip (overrides generic "reason")
+  const reasonText = urgency || item.reason;
   return (
     <PressScale testID={testID} onPress={() => onBuy(item)} style={s.tile as any}>
       <View style={s.tileImg}><Ionicons name="bag-handle" size={34} color="#E30613" /></View>
@@ -70,8 +72,12 @@ function ProductTile({ item, xp, onBuy, testID }: any) {
         </View>
       )}
       <Text style={s.tileName} numberOfLines={2}>{item.name}</Text>
-      {item.reason && (
-        <Text style={s.tileReason} numberOfLines={1} testID={`${testID}-reason`}>💡 {item.reason}</Text>
+      {reasonText && (
+        <View style={[s.urgencyChip, urgency ? s.urgencyChipStrong : null] as any}>
+          <Text style={[s.tileReason, urgency ? s.urgencyTextStrong : null]} numberOfLines={1} testID={`${testID}-reason`}>
+            {urgency ? '🔥 ' : '💡 '}{reasonText}
+          </Text>
+        </View>
       )}
       <View style={s.tilePriceRow}>
         <Text style={s.tilePrice}>{item.price} ₴</Text>
@@ -187,7 +193,7 @@ export default function StudentMarket() {
               <SectionHeader icon="star" iconColor="#F59E0B" title="Тренер рекомендує" subtitle="Для твого рівня підготовки" />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
                 {coachRecommended.map((p: any, i: number) => (
-                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`coach-rec-${i}`} />
+                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`coach-rec-${i}`} urgency="Тренер рекомендує для цього етапу" />
                 ))}
               </ScrollView>
             </View>
@@ -201,7 +207,7 @@ export default function StudentMarket() {
               <SectionHeader icon="ribbon" iconColor="#7C3AED" title="Під твій пояс" subtitle={BELT_STARTER_HINT[belt] || 'Товари для твого етапу'} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
                 {beltStarter.map((p: any, i: number) => (
-                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`belt-starter-${i}`} />
+                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`belt-starter-${i}`} urgency="Тобі не вистачає — для твого рівня" />
                 ))}
               </ScrollView>
             </View>
@@ -215,7 +221,7 @@ export default function StudentMarket() {
               <SectionHeader icon="trophy" iconColor="#EF4444" title="Підготовка до турніру" subtitle={`«${nextComp.name}»${nextComp.daysUntil != null ? ` · через ${nextComp.daysUntil} днів` : ''}`} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
                 {beforeCompetitions.map((p: any, i: number) => (
-                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`before-comp-${i}`} />
+                  <ProductTile key={p.id || i} item={p} xp={xp} onBuy={handleBuy} testID={`before-comp-${i}`} urgency={`Потрібно до турніру · ${nextComp.daysUntil || 14} днів`} />
                 ))}
               </ScrollView>
             </View>
@@ -357,7 +363,18 @@ const s = StyleSheet.create({
   tileCoachBadge: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFBEB', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: '#FDE68A' },
   tileCoachBadgeT: { fontSize: 9, fontWeight: '800', color: '#92400E' },
   tileName: { fontSize: 13, fontWeight: '700', color: '#0F0F10', minHeight: 34 },
-  tileReason: { fontSize: 10, color: '#7C3AED', fontWeight: '600', marginTop: 4, opacity: 0.85 },
+  urgencyChip: { marginTop: 6 },
+  urgencyChipStrong: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  urgencyTextStrong: { color: '#B91C1C', fontWeight: '800', opacity: 1 },
+  tileReason: { fontSize: 10, color: '#7C3AED', fontWeight: '600', opacity: 0.85 },
   tilePriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 8 },
   tilePrice: { fontSize: 17, fontWeight: '900', color: '#0F0F10' },
   tileOld: { fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' },
