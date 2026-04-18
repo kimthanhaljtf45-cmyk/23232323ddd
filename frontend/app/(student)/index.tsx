@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../src/store/useStore';
 import { api } from '../../src/lib/api';
+import { PressScale, FadeInUp, Toast, XPPop } from '../../src/components/motion';
 
 /**
  * JUNIOR X10 — ГОЛОВНА
@@ -123,14 +124,14 @@ function EventCard({ event, onAction }: { event: any; onAction: (a: string, e?: 
       {event.actions?.length > 0 && (
         <View style={s.eventActions}>
           {event.actions.slice(0, 1).map((a: any, i: number) => (
-            <TouchableOpacity
+            <PressScale
               key={i}
               testID={`event-action-${a.action}`}
-              style={s.eventBtn}
+              style={s.eventBtn as any}
               onPress={() => onAction(a.action, event)}
             >
               <Text style={s.eventBtnText}>{a.label}</Text>
-            </TouchableOpacity>
+            </PressScale>
           ))}
         </View>
       )}
@@ -140,11 +141,26 @@ function EventCard({ event, onAction }: { event: any; onAction: (a: string, e?: 
 
 function NextTrainingCard({ training, onConfirm, onSkip }: any) {
   if (!training) return null;
+  // X10: Status badge "Сьогодні" / "Завтра" / "Через N днів"
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const trainingDate = (training.date || '').slice(0, 10);
+  let statusLabel = 'НАСТУПНЕ';
+  let statusColor = '#E30613';
+  if (trainingDate && trainingDate === todayISO) {
+    statusLabel = 'СЬОГОДНІ';
+    statusColor = '#E30613';
+  } else if (trainingDate) {
+    const d = new Date(trainingDate);
+    const now = new Date(todayISO);
+    const diff = Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 1) { statusLabel = 'ЗАВТРА'; statusColor = '#F59E0B'; }
+    else if (diff > 1 && diff <= 7) { statusLabel = `ЧЕРЕЗ ${diff} ДН`; statusColor = '#3B82F6'; }
+  }
   return (
     <View style={s.trainingCard} testID="next-training">
       <View style={s.tHead}>
-        <View style={s.tBadge}>
-          <Text style={s.tBadgeText}>НАСТУПНЕ</Text>
+        <View style={[s.tBadge, { backgroundColor: statusColor }]}>
+          <Text style={s.tBadgeText}>{statusLabel}</Text>
         </View>
         <Text style={s.tTime}>{training.startTime}–{training.endTime}</Text>
       </View>
@@ -153,20 +169,21 @@ function NextTrainingCard({ training, onConfirm, onSkip }: any) {
         <Ionicons name="location" size={12} color="#9CA3AF" /> {training.location}
       </Text>
       <View style={s.tActions}>
-        <TouchableOpacity testID="confirm-training-btn" style={s.tConfirm} onPress={onConfirm}>
+        <PressScale testID="confirm-training-btn" style={s.tConfirm as any} onPress={onConfirm}>
           <Ionicons name="checkmark" size={16} color="#FFF" />
           <Text style={s.tConfirmText}>Підтвердити</Text>
-        </TouchableOpacity>
-        <TouchableOpacity testID="skip-training-btn" style={s.tSkip} onPress={onSkip}>
+        </PressScale>
+        <PressScale testID="skip-training-btn" style={s.tSkip as any} onPress={onSkip}>
           <Text style={s.tSkipText}>Не прийду</Text>
-        </TouchableOpacity>
+        </PressScale>
       </View>
     </View>
   );
 }
 
-function DailyTasks({ onAction }: { onAction: (a: string) => void }) {
+function DailyTasks({ onAction, onAllComplete }: { onAction: (a: string) => void; onAllComplete?: () => void }) {
   const [tasks, setTasks] = useState<any[]>([]);
+  const prevDone = React.useRef<number>(-1);
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
@@ -175,6 +192,15 @@ function DailyTasks({ onAction }: { onAction: (a: string) => void }) {
       } catch {}
     })();
   }, []));
+  // Trigger callback when transitioning to all done
+  useEffect(() => {
+    if (!tasks.length) return;
+    const done = tasks.filter((t) => t.done).length;
+    if (prevDone.current !== -1 && done === tasks.length && prevDone.current < tasks.length) {
+      onAllComplete && onAllComplete();
+    }
+    prevDone.current = done;
+  }, [tasks]);
   if (!tasks.length) return null;
   const done = tasks.filter((t) => t.done).length;
   return (
@@ -182,10 +208,10 @@ function DailyTasks({ onAction }: { onAction: (a: string) => void }) {
       <Text style={s.sectionLabel}>ЩОДЕННІ ЗАВДАННЯ · {done}/{tasks.length}</Text>
       <View style={s.dailyCard}>
         {tasks.map((t, i) => (
-          <TouchableOpacity
+          <PressScale
             key={i}
             testID={`daily-${t.id}`}
-            style={[s.dailyRow, i !== tasks.length - 1 && s.dailyRowBorder]}
+            style={[s.dailyRow, i !== tasks.length - 1 && s.dailyRowBorder] as any}
             onPress={() => !t.done && onAction(t.id === 'confirm_training' ? 'schedule' : t.id === 'write_coach' ? 'coach_message' : '')}
             disabled={!!t.done}
           >
@@ -196,12 +222,12 @@ function DailyTasks({ onAction }: { onAction: (a: string) => void }) {
             />
             <Text style={[s.dailyText, t.done && s.dailyDone]}>{t.text}</Text>
             <Text style={s.dailyXp}>+{t.xp} XP</Text>
-          </TouchableOpacity>
+          </PressScale>
         ))}
         {done === tasks.length && (
           <View style={s.bonusBanner}>
             <Ionicons name="sparkles" size={14} color="#F59E0B" />
-            <Text style={s.bonusText}>+20 XP бонус за день!</Text>
+            <Text style={s.bonusText}>🎉 Всі завдання виконані! +20 XP бонус за день</Text>
           </View>
         )}
       </View>
@@ -333,6 +359,8 @@ export default function StudentHome() {
   const [coachMsg, setCoachMsg] = useState('');
   const [skipFlow, setSkipFlow] = useState<'hidden' | 'reason' | 'followup'>('hidden');
   const [skipReason, setSkipReason] = useState('');
+  const [toast, setToast] = useState<{ visible: boolean; text: string; tone?: 'success' | 'soft' | 'info'; icon?: string }>({ visible: false, text: '' });
+  const [xpPop, setXpPop] = useState<{ visible: boolean; xp: number }>({ visible: false, xp: 0 });
   const user = useStore((st) => st.user);
   const router = useRouter();
   const params = useLocalSearchParams<{ openCoach?: string }>();
@@ -394,10 +422,12 @@ export default function StudentHome() {
           // Sprint 3 MUST: apply XP to real backend
           const xpRes: any = await api.post('/student/xp/apply', { source: 'training_confirm' }).catch(() => null);
           const delta = xpRes?.data?.delta || xpRes?.delta || 5;
-          Alert.alert('✅ Підтверджено', `+${delta} XP · Тренер отримав сповіщення`);
+          // X10 Behavior: XP animation + success toast (instead of Alert)
+          setXpPop({ visible: true, xp: delta });
+          setToast({ visible: true, text: '🔥 Ти молодець! Тренер отримав сповіщення', tone: 'success', icon: 'checkmark-circle' });
           fetchData();
         } catch {
-          Alert.alert('Помилка');
+          setToast({ visible: true, text: 'Не вдалося підтвердити. Спробуйте ще раз', tone: 'info', icon: 'alert-circle' });
         }
         break;
       case 'skip_training':
@@ -451,6 +481,8 @@ export default function StudentHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+      <Toast visible={toast.visible} text={toast.text} tone={toast.tone} icon={toast.icon} onHide={() => setToast({ visible: false, text: '' })} />
+      <XPPop visible={xpPop.visible} xp={xpPop.xp} onDone={() => setXpPop({ visible: false, xp: 0 })} />
       <ScrollView
         style={s.scroll}
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -466,48 +498,73 @@ export default function StudentHome() {
         }
       >
         {/* B. HERO бойца (только для Junior; Adult использует свой экран) */}
-        {isJunior && <HeroFighter user={user} junior={junior} streak={streak} attendance={attendance} />}
+        {isJunior && (
+          <FadeInUp>
+            <HeroFighter user={user} junior={junior} streak={streak} attendance={attendance} />
+          </FadeInUp>
+        )}
 
         {/* Group Rank pill (Junior mini-leaderboard) */}
         {isJunior && rank?.position != null && (
-          <TouchableOpacity
-            testID="group-rank-pill"
-            style={s.rankPill}
-            onPress={() => router.push('/(student)/progress' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={s.rankIcon}>
-              <Ionicons name="trophy" size={16} color="#F59E0B" />
-            </View>
-            <Text style={s.rankT}>
-              Ви #{rank.position} у групі «{rank.groupName}»
-            </Text>
-            {rank.clubPosition && rank.clubTotal > 0 && (
-              <Text style={s.rankSub}>· #{rank.clubPosition} у клубі</Text>
-            )}
-          </TouchableOpacity>
+          <FadeInUp delay={80}>
+            <PressScale
+              testID="group-rank-pill"
+              style={s.rankPill as any}
+              onPress={() => router.push('/(student)/progress' as any)}
+            >
+              <View style={s.rankIcon}>
+                <Ionicons name="trophy" size={16} color="#F59E0B" />
+              </View>
+              <Text style={s.rankT}>
+                Ви #{rank.position} у групі «{rank.groupName}»
+              </Text>
+              {rank.clubPosition && rank.clubTotal > 0 && (
+                <Text style={s.rankSub}>· #{rank.clubPosition} у клубі</Text>
+              )}
+            </PressScale>
+          </FadeInUp>
         )}
 
         {/* C. Один сильный state-event */}
         {events.map((e: any, i: number) => (
-          <EventCard key={i} event={e} onAction={onAction} />
+          <FadeInUp key={i} delay={120}>
+            <EventCard event={e} onAction={onAction} />
+          </FadeInUp>
         ))}
 
         {/* D. Наступне тренування */}
-        <NextTrainingCard
-          training={training}
-          onConfirm={() => onAction('confirm_training')}
-          onSkip={() => onAction('skip_training')}
-        />
+        <FadeInUp delay={160}>
+          <NextTrainingCard
+            training={training}
+            onConfirm={() => onAction('confirm_training')}
+            onSkip={() => onAction('skip_training')}
+          />
+        </FadeInUp>
 
         {/* E. Щоденні завдання */}
-        <DailyTasks onAction={onAction} />
+        <FadeInUp delay={200}>
+          <DailyTasks
+            onAction={onAction}
+            onAllComplete={() => {
+              setToast({ visible: true, text: '🎉 Всі завдання виконані! +20 XP бонус', tone: 'success', icon: 'sparkles' });
+              setXpPop({ visible: true, xp: 20 });
+            }}
+          />
+        </FadeInUp>
 
         {/* F. Шлях до поясу (только Junior) */}
-        {isJunior && junior && <BeltPathBlock junior={junior} />}
+        {isJunior && junior && (
+          <FadeInUp delay={240}>
+            <BeltPathBlock junior={junior} />
+          </FadeInUp>
+        )}
 
         {/* G. Змагання (только Junior) */}
-        {isJunior && <CompetitionsBlock junior={junior} />}
+        {isJunior && (
+          <FadeInUp delay={280}>
+            <CompetitionsBlock junior={junior} />
+          </FadeInUp>
+        )}
 
         {/* H. Рекомендовано */}
         {recs.length > 0 && (
@@ -699,26 +756,29 @@ const s = StyleSheet.create({
     marginTop: 12,
   },
 
-  // Section wrapper
-  section: { marginTop: 20 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  // Section wrapper — vertical rhythm 24
+  section: { marginTop: 24 },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#6B7280',
-    letterSpacing: 0.8,
-    marginBottom: 10,
+    letterSpacing: 1,
+    marginBottom: 12,
   },
   sectionLink: { fontSize: 12, fontWeight: '700', color: '#E30613' },
 
-  // B. Hero
+  // B. Hero — Level 1 (shadow-md, no border)
   hero: {
     backgroundColor: '#FFF',
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderRadius: 20,
+    padding: 18,
+    marginTop: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start' },
   heroName: { fontSize: 22, fontWeight: '800', color: '#0F0F10' },
@@ -763,27 +823,30 @@ const s = StyleSheet.create({
   eventBtn: { backgroundColor: '#0F0F10', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   eventBtnText: { fontSize: 13, fontWeight: '700', color: '#FFF' },
 
-  // D. Training
+  // D. Training — Level 1 (bigger, bolder as per X10 review)
   trainingCard: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  tHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  tHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   tBadge: {
     backgroundColor: '#E30613',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
   },
-  tBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  tTime: { fontSize: 14, fontWeight: '700', color: '#0F0F10' },
-  tTitle: { fontSize: 16, fontWeight: '700', color: '#0F0F10', marginTop: 4 },
-  tLoc: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
-  tActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  tBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  tTime: { fontSize: 15, fontWeight: '800', color: '#0F0F10' },
+  tTitle: { fontSize: 17, fontWeight: '800', color: '#0F0F10', marginTop: 6 },
+  tLoc: { fontSize: 12, color: '#9CA3AF', marginTop: 6 },
+  tActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   tConfirm: {
     flex: 1,
     flexDirection: 'row',
@@ -791,19 +854,19 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#10B981',
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
   },
-  tConfirmText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  tConfirmText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
   tSkip: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
   },
-  tSkipText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
+  tSkipText: { color: '#6B7280', fontSize: 14, fontWeight: '700' },
 
   // E. Daily
   dailyCard: {

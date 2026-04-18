@@ -5,6 +5,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
+import { PressScale, FadeInUp } from '../../src/components/motion';
 
 /**
  * JUNIOR X10 — АКТИВНІСТЬ
@@ -42,7 +43,7 @@ const TYPE_CFG: Record<string, { icon: string; color: string; bg: string; catego
   system: { icon: 'information-circle', color: '#6B7280', bg: '#F3F4F6', category: 'club' },
 };
 
-function ActivityCard({ item, onAction }: { item: any; onAction: (type: string, item: any) => void }) {
+function ActivityCard({ item, index, onAction }: { item: any; index: number; onAction: (type: string, item: any) => void }) {
   const cfg = TYPE_CFG[item.type] || TYPE_CFG.system;
   const timeAgo = item.timeAgo || item.time || '';
   const category = cfg.category;
@@ -58,59 +59,58 @@ function ActivityCard({ item, onAction }: { item: any; onAction: (type: string, 
     priority === 'important' ? '#F59E0B' :
     cfg.color;
 
-  // Action per category
-  const actions: { label: string; icon: string; act: string }[] = [];
+  // X10: One primary action per card (as per product review)
+  let primary: { label: string; icon: string; act: string } | null = null;
   if (category === 'coach') {
-    actions.push({ label: 'Написати тренеру', icon: 'chatbubble-ellipses', act: 'write_coach' });
+    primary = { label: 'Написати тренеру', icon: 'chatbubble-ellipses', act: 'write_coach' };
   } else if (category === 'club' && (item.type === 'competition' || item.type === 'announcement')) {
-    actions.push({ label: 'Деталі', icon: 'arrow-forward', act: 'details' });
+    primary = { label: 'Деталі', icon: 'arrow-forward', act: 'details' };
   } else if (category === 'club' && (item.type === 'training' || item.type === 'reminder')) {
-    actions.push({ label: 'До тренувань', icon: 'calendar', act: 'to_schedule' });
+    primary = { label: 'До тренувань', icon: 'calendar', act: 'to_schedule' };
   } else if (category === 'achievements' && item.type === 'belt') {
-    actions.push({ label: 'Мій прогрес', icon: 'trophy', act: 'to_progress' });
+    primary = { label: 'Мій прогрес', icon: 'trophy', act: 'to_progress' };
   }
 
   return (
-    <View style={[s.card, priorityStyle, { borderLeftColor: priorityBorder }]} testID={`activity-${item.id}`}>
-      {priority === 'critical' && (
-        <View style={s.priorityBadge} testID={`priority-${item.id}-critical`}>
-          <Ionicons name="alert-circle" size={10} color="#FFF" />
-          <Text style={s.priorityBadgeT}>ВАЖЛИВО</Text>
+    <FadeInUp delay={Math.min(index * 40, 240)}>
+      <View style={[s.card, priorityStyle, { borderLeftColor: priorityBorder }]} testID={`activity-${item.id}`}>
+        {priority === 'critical' && (
+          <View style={s.priorityBadge} testID={`priority-${item.id}-critical`}>
+            <Ionicons name="alert-circle" size={10} color="#FFF" />
+            <Text style={s.priorityBadgeT}>ВАЖЛИВО</Text>
+          </View>
+        )}
+        <View style={s.cardTop}>
+          <View style={[s.cardIcon, { backgroundColor: cfg.bg }]}>
+            <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.cardTitle} numberOfLines={2}>
+              {item.title || item.text}
+            </Text>
+            {item.description && <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>}
+            {timeAgo && <Text style={s.cardTime}>{timeAgo}</Text>}
+          </View>
+          {item.xp && (
+            <View style={s.xpBadge}>
+              <Text style={s.xpBadgeT}>+{item.xp} XP</Text>
+            </View>
+          )}
         </View>
-      )}
-      <View style={s.cardTop}>
-        <View style={[s.cardIcon, { backgroundColor: cfg.bg }]}>
-          <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
-        </View>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={s.cardTitle} numberOfLines={2}>
-            {item.title || item.text}
-          </Text>
-          {item.description && <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>}
-          {timeAgo && <Text style={s.cardTime}>{timeAgo}</Text>}
-        </View>
-        {item.xp && (
-          <View style={s.xpBadge}>
-            <Text style={s.xpBadgeT}>+{item.xp} XP</Text>
+        {primary && (
+          <View style={s.cardActions}>
+            <PressScale
+              testID={`action-${item.id}-${primary.act}`}
+              onPress={() => onAction(primary!.act, item)}
+              style={[s.actionBtn, priority === 'critical' && s.actionBtnCritical] as any}
+            >
+              <Ionicons name={primary.icon as any} size={14} color={priority === 'critical' ? '#FFF' : '#7C3AED'} />
+              <Text style={[s.actionBtnT, priority === 'critical' && s.actionBtnTCritical]}>{primary.label}</Text>
+            </PressScale>
           </View>
         )}
       </View>
-      {actions.length > 0 && (
-        <View style={s.cardActions}>
-          {actions.map((a, i) => (
-            <TouchableOpacity
-              key={i}
-              testID={`action-${item.id}-${a.act}`}
-              style={[s.actionBtn, priority === 'critical' && s.actionBtnCritical]}
-              onPress={() => onAction(a.act, item)}
-            >
-              <Ionicons name={a.icon as any} size={13} color={priority === 'critical' ? '#FFF' : '#7C3AED'} />
-              <Text style={[s.actionBtnT, priority === 'critical' && s.actionBtnTCritical]}>{a.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
+    </FadeInUp>
   );
 }
 
@@ -234,7 +234,7 @@ export default function StudentFeed() {
             <Text style={s.emptyS}>Тренуйся — і стрічка оживе</Text>
           </View>
         ) : (
-          filtered.map((it, i) => <ActivityCard key={it.id || i} item={it} onAction={handleAction} />)
+          filtered.map((it, i) => <ActivityCard key={it.id || i} item={it} index={i} onAction={handleAction} />)
         )}
       </ScrollView>
     </View>
@@ -280,29 +280,34 @@ const s = StyleSheet.create({
 
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#F1F1F4',
     borderLeftWidth: 4,
     position: 'relative',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  // Sprint 3 MUST: priority weights
-  cardCritical: { borderLeftWidth: 5, borderColor: '#FECACA', backgroundColor: '#FFFBFA' },
+  // Sprint 3 MUST: priority weights — critical gets MORE padding, bolder border
+  cardCritical: { borderLeftWidth: 5, borderColor: '#FECACA', backgroundColor: '#FFFBFA', padding: 20, marginBottom: 14 },
   cardImportant: { borderLeftWidth: 4, borderColor: '#FDE68A' },
-  cardInfo: { borderLeftWidth: 3, opacity: 0.92 },
+  cardInfo: { borderLeftWidth: 3, opacity: 0.95 },
   priorityBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#E30613',
     borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     zIndex: 2,
   },
   priorityBadgeT: { color: '#FFF', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
