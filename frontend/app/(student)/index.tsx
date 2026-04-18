@@ -33,7 +33,7 @@ const BELT_COLORS: Record<string, { bg: string; text: string; border: string; la
   BLACK: { bg: '#1F2937', text: '#FFFFFF', border: '#374151', label: 'Чорний' },
 };
 
-function HeroFighter({ user, junior, streak, attendance }: any) {
+function HeroFighter({ user, junior, streak, attendance, rank }: any) {
   const belt = BELT_COLORS[junior?.belt || 'WHITE'] || BELT_COLORS.WHITE;
   const nextBelt = BELT_COLORS[junior?.nextBelt || 'YELLOW'] || BELT_COLORS.YELLOW;
   const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Учень';
@@ -50,6 +50,18 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
   else if (streak >= 5) motivation = `🔥 Серія ${streak} тренувань — так тримати!`;
   else if (streak >= 3) motivation = `Ти на хвилі · ${streak} тренувань підряд`;
   else if (completed > 0) motivation = 'Кожне тренування наближає апгрейд';
+
+  // X10 FINAL FIX: Pressure line — превращает мотивацию в давление
+  let pressure: string | null = null;
+  if (streak >= 3) {
+    pressure = `⚠️ Якщо пропустиш — втратиш серію з ${streak} тренувань`;
+  } else if (rank?.position && rank.position <= 3 && rank.groupTotal > 3) {
+    pressure = `⚠️ Ще 2 пропуски → випадеш з топ-3`;
+  } else if (attendance > 0 && attendance < 70) {
+    pressure = `⚠️ Відвідуваність падає — тренер помітить`;
+  } else if (remaining > 0 && remaining <= 3) {
+    pressure = `⚠️ Ще ${remaining} — і атестація близько, не загуби темп`;
+  }
 
   return (
     <View style={s.hero} testID="hero-fighter">
@@ -74,6 +86,11 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
 
       {/* X10 FIX: Motivation line — "я стаю сильнішим", not counter */}
       <Text style={s.heroMotivation} testID="hero-motivation">{motivation}</Text>
+
+      {/* X10 FINAL FIX: Pressure line (only if applicable) */}
+      {pressure && (
+        <Text style={s.heroPressure} testID="hero-pressure">{pressure}</Text>
+      )}
 
       {/* Belt progress bar — upgrade framing */}
       <View style={s.beltProgress}>
@@ -114,12 +131,48 @@ function HeroFighter({ user, junior, streak, attendance }: any) {
   );
 }
 
-// X10 FIX: Primary CTA banner — ONE dominant action per screen
-function PrimaryCTABanner({ training, onConfirm, onSchedule }: any) {
+// X10 FINAL FIX: Behavior-driven primary CTA (priority: missed > streakBroken > today > schedule)
+function PrimaryCTABanner({ training, junior, streak, attendance, onConfirm, onSchedule, onComeback }: any) {
   const todayISO = new Date().toISOString().slice(0, 10);
   const trainingDate = (training?.date || '').slice(0, 10);
   const isToday = trainingDate && trainingDate === todayISO;
 
+  const missedLast = junior?.missedLastTraining || (attendance > 0 && attendance < 60);
+  const streakBroken = junior?.streakBroken || (streak === 0 && (junior?.lastStreak || 0) >= 3);
+
+  // Priority 1: Missed training — highest urgency
+  if (missedLast) {
+    return (
+      <PressScale testID="primary-cta-banner" style={s.primaryCTACritical as any} onPress={onComeback || onSchedule}>
+        <View style={s.primaryCTAIcon}>
+          <Ionicons name="warning" size={22} color="#FFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Повернись на тренування</Text>
+          <Text style={s.primaryCTASub}>⚠️ Ти пропустив · тренер чекає на тебе</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+
+  // Priority 2: Streak broken — recovery
+  if (streakBroken) {
+    return (
+      <PressScale testID="primary-cta-banner" style={s.primaryCTAAmber as any} onPress={onSchedule}>
+        <View style={s.primaryCTAIcon}>
+          <Ionicons name="flame" size={22} color="#FFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.primaryCTATitle}>Почати серію заново</Text>
+          <Text style={s.primaryCTASub}>🔥 Запишись — і відкати серію з першого дня</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#FFF" />
+      </PressScale>
+    );
+  }
+
+  // Priority 3: Training today → confirm
   if (isToday) {
     return (
       <PressScale testID="primary-cta-banner" style={s.primaryCTA as any} onPress={onConfirm}>
@@ -134,7 +187,8 @@ function PrimaryCTABanner({ training, onConfirm, onSchedule }: any) {
       </PressScale>
     );
   }
-  // No training today → schedule CTA
+
+  // Priority 4: Default — schedule
   return (
     <PressScale testID="primary-cta-banner" style={s.primaryCTA as any} onPress={onSchedule}>
       <View style={s.primaryCTAIcon}>
@@ -469,13 +523,13 @@ export default function StudentHome() {
           // Sprint 3 MUST: apply XP to real backend
           const xpRes: any = await api.post('/student/xp/apply', { source: 'training_confirm' }).catch(() => null);
           const delta = xpRes?.data?.delta || xpRes?.delta || 5;
-          // X10 FIX: Connect XP to growth — "+5 XP · Ще N XP до рівня"
+          // X10 FINAL FIX: Consequence + growth connection
           const currentXp = (data?.gamification?.xp || data?.junior?.xp || 0) + delta;
           const toNextLevel = 100 - (currentXp % 100);
           setXpPop({ visible: true, xp: delta });
           setToast({
             visible: true,
-            text: `🔥 Ти молодець! +${delta} XP · Ще ${toNextLevel} XP до рівня`,
+            text: `✅ Ти підтвердив → тренер бачить це · +${delta} XP · ще ${toNextLevel} до рівня`,
             tone: 'success',
             icon: 'checkmark-circle',
           });
@@ -498,11 +552,17 @@ export default function StudentHome() {
     if (!coachMsg.trim()) return;
     try {
       await api.post('/student/coach-message', { text: coachMsg });
-      Alert.alert('✅', 'Надіслано тренеру');
       setShowCoachModal(false);
       setCoachMsg('');
+      // X10 FINAL FIX: Consequence — system responds
+      setToast({
+        visible: true,
+        text: '📨 Повідомлення надіслано тренеру · очікуй відповідь',
+        tone: 'success',
+        icon: 'mail',
+      });
     } catch {
-      Alert.alert('Помилка');
+      setToast({ visible: true, text: 'Не вдалося надіслати. Спробуйте ще раз', tone: 'info', icon: 'alert-circle' });
     }
   };
 
@@ -551,13 +611,17 @@ export default function StudentHome() {
           />
         }
       >
-        {/* X10 FIX: Primary CTA banner — ONE dominant action */}
+        {/* X10 FIX: Primary CTA banner — ONE dominant action (behavior-driven priority) */}
         {isJunior && (
           <FadeInUp>
             <PrimaryCTABanner
               training={training}
+              junior={junior}
+              streak={streak}
+              attendance={attendance}
               onConfirm={() => onAction('confirm_training')}
               onSchedule={() => onAction('schedule')}
+              onComeback={() => onAction('schedule')}
             />
           </FadeInUp>
         )}
@@ -565,7 +629,7 @@ export default function StudentHome() {
         {/* B. HERO бойца (только для Junior; Adult использует свой экран) */}
         {isJunior && (
           <FadeInUp delay={60}>
-            <HeroFighter user={user} junior={junior} streak={streak} attendance={attendance} />
+            <HeroFighter user={user} junior={junior} streak={streak} attendance={attendance} rank={rank} />
           </FadeInUp>
         )}
 
@@ -705,8 +769,15 @@ export default function StudentHome() {
                         });
                         setSkipReason(r.l);
                         setSkipFlow('followup');
+                        // X10 FINAL FIX: Consequence — "Тренер отримав повідомлення"
+                        setToast({
+                          visible: true,
+                          text: '📨 Тренер отримав повідомлення · дякуємо, що попередив',
+                          tone: 'soft',
+                          icon: 'mail',
+                        });
                       } catch {
-                        Alert.alert('Помилка');
+                        setToast({ visible: true, text: 'Не вдалося зберегти. Спробуйте ще раз', tone: 'info', icon: 'alert-circle' });
                       }
                     }}
                   >
@@ -849,6 +920,39 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center', justifyContent: 'center',
   },
+  // X10 FINAL: CTA variants (critical = missed, amber = streak broken)
+  primaryCTACritical: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#991B1B',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 16,
+    shadowColor: '#991B1B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#7F1D1D',
+  },
+  primaryCTAAmber: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#D97706',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 16,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+  },
   primaryCTATitle: { color: '#FFF', fontSize: 16, fontWeight: '800' },
   primaryCTASub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600', marginTop: 2 },
 
@@ -892,6 +996,19 @@ const s = StyleSheet.create({
   heroGroup: { fontSize: 13, color: '#6B7280', marginTop: 6 },
   // X10 FIX: motivation line in hero
   heroMotivation: { fontSize: 13, color: '#0F0F10', fontWeight: '700', marginTop: 12, lineHeight: 18 },
+  // X10 FINAL: pressure line — soft warning, превращает мотивацию в давление
+  heroPressure: {
+    fontSize: 12,
+    color: '#B45309',
+    fontWeight: '700',
+    marginTop: 6,
+    backgroundColor: '#FFFBEB',
+    borderLeftWidth: 3,
+    borderLeftColor: '#F59E0B',
+    paddingLeft: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
 
   beltProgress: { marginTop: 16 },
   beltProgressHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

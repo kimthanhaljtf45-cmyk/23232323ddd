@@ -84,6 +84,11 @@ function ProductTile({ item, xp, onBuy, testID, urgency }: any) {
         {item.oldPrice && item.oldPrice > item.price && <Text style={s.tileOld}>{item.oldPrice}</Text>}
       </View>
       {discount > 0 && <Text style={s.tileXp}>-{discount} ₴ за XP</Text>}
+      {/* X10 FINAL: Purchase reward — "покупка → рост" */}
+      <View style={s.xpRewardChip}>
+        <Ionicons name="sparkles" size={9} color="#065F46" />
+        <Text style={s.xpRewardT}>+5 XP · +1 дисципліна</Text>
+      </View>
       <View style={s.socialProof}>
         <Ionicons name="flame" size={10} color="#F97316" />
         <Text style={s.socialProofT}>Купили {bought} учнів</Text>
@@ -135,7 +140,7 @@ export default function StudentMarket() {
         { text: 'Скасувати', style: 'cancel' },
         {
           text: 'Замовити',
-          onPress: () => setToast({ visible: true, text: '✅ Замовлення оформлено!' }),
+          onPress: () => setToast({ visible: true, text: '✅ Замовлення оформлено · +5 XP · +1 дисципліна' }),
         },
       ],
     );
@@ -286,6 +291,11 @@ export default function StudentMarket() {
                       {p.oldPrice && <Text style={s.prodOld}>{p.oldPrice} ₴</Text>}
                     </View>
                     {xp >= 50 && <Text style={s.prodXp}>-{Math.round(p.price * 0.05)} ₴ за XP</Text>}
+                    {/* X10 FINAL: Purchase reward chip */}
+                    <View style={s.xpRewardChip}>
+                      <Ionicons name="sparkles" size={9} color="#065F46" />
+                      <Text style={s.xpRewardT}>+5 XP · +1 дисципліна</Text>
+                    </View>
                     {p.isCoachRecommended && (
                       <View style={s.coachPick}>
                         <Ionicons name="star" size={11} color="#F59E0B" />
@@ -382,6 +392,21 @@ const s = StyleSheet.create({
 
   socialProof: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   socialProofT: { fontSize: 10, fontWeight: '700', color: '#F97316' },
+  // X10 FINAL: XP reward chip — "покупка → рост"
+  xpRewardChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 6,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+  },
+  xpRewardT: { fontSize: 10, fontWeight: '800', color: '#065F46' },
 
   // Divider
   divider: { height: 1, backgroundColor: '#F1F1F4', marginVertical: 28, marginHorizontal: 16 },
