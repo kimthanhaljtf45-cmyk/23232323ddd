@@ -2956,14 +2956,22 @@ async def _get_user_from_auth(request: Request):
     return None
 
 def _get_children_for_user(database, user_id: str):
-    children = list(database["children"].find({"parentId": ObjectId(user_id)}))
-    if not children:
-        children = list(database["children"].find({"userId": ObjectId(user_id)}))
-    if not children:
-        children = list(database["children"].find({"roleOwnerId": ObjectId(user_id)}))
-    if not children:
-        children = list(database["children"].find().limit(3))
-    return children
+    """Phase 1: strict parent↔child linkage (no fallback)."""
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        oid = None
+    queries = []
+    if oid:
+        queries.append({"parentId": oid})
+        queries.append({"parentIds": oid})
+    queries.append({"parentId": str(user_id)})
+    queries.append({"parentIds": str(user_id)})
+    for q in queries:
+        children = list(database["children"].find(q))
+        if children:
+            return children
+    return []
 
 @app.get("/api/parent/home")
 async def get_parent_home_v2(request: Request):
@@ -3245,10 +3253,23 @@ async def get_parent_home_v2(request: Request):
         else:
             c["primaryCta"] = {"label": "Переглянути прогрес", "action": "open_progress", "payload": {"childId": c["id"]}}
 
+    # ---- EMPTY STATE (when no children linked) ----
+    empty_state = None
+    if not children_data:
+        empty_state = {
+            "title": "Дітей ще не додано",
+            "subtitle": "Додайте дитину або отримайте код від тренера",
+            "actions": [
+                {"label": "Додати дитину", "action": "add_child", "style": "primary"},
+                {"label": "Ввести код клубу", "action": "link_child_by_code", "style": "secondary"},
+            ],
+        }
+
     return JSONResponse(content=json.loads(json.dumps({
         "parent": {"name": user_name, "id": user_id},
         "priorityBlock": priority_block,
         "children": children_data,
+        "emptyState": empty_state,
         "today": today_schedule,
         "alerts": all_alerts,
         "finance": {
@@ -3262,6 +3283,80 @@ async def get_parent_home_v2(request: Request):
         "recommendations": recommendations,
         "feedHighlights": feed_highlights,
     }, default=json_serial)))
+
+
+# ============================================================
+# PARENT ↔ CHILD LINKAGE
+# ============================================================
+
+@app.post("/api/parent/add-child")
+async def parent_add_child(request: Request):
+    """Create a new child linked to the current parent."""
+    database = get_db()
+    user = await _get_user_from_auth(request)
+    if not user:
+        return JSONResponse(content={"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = (body.get("name") or "").strip()
+    birth_date = (body.get("birthDate") or "").strip()
+    if not name:
+        return JSONResponse(content={"error": "Name required"}, status_code=400)
+    parts = name.split(" ", 1)
+    first_name = parts[0]
+    last_name = parts[1] if len(parts) > 1 else ""
+    try:
+        parent_oid = ObjectId(user.get("id") or user.get("_id"))
+    except Exception:
+        parent_oid = str(user.get("id") or user.get("_id"))
+    doc = {
+        "firstName": first_name,
+        "lastName": last_name,
+        "parentId": parent_oid,
+        "birthDate": birth_date or "2016-01-01",
+        "status": "ACTIVE",
+        "belt": "WHITE",
+        "monthlyGoalTarget": 12,
+        "createdAt": datetime.now(timezone.utc),
+        "updatedAt": datetime.now(timezone.utc),
+    }
+    res = database["children"].insert_one(doc)
+    return JSONResponse(content={
+        "ok": True,
+        "childId": str(res.inserted_id),
+        "child": {"id": str(res.inserted_id), "name": name, "belt": "WHITE"},
+    })
+
+
+@app.post("/api/parent/link-child-by-code")
+async def parent_link_child_by_code(request: Request):
+    """Link existing child to parent by invite code (shared by coach)."""
+    database = get_db()
+    user = await _get_user_from_auth(request)
+    if not user:
+        return JSONResponse(content={"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    code = (body.get("code") or "").strip().upper()
+    if not code:
+        return JSONResponse(content={"error": "Code required"}, status_code=400)
+    invite = database["parent_invites"].find_one({"code": code, "used": {"$ne": True}})
+    if not invite:
+        return JSONResponse(content={"error": "Invalid or already used code"}, status_code=404)
+    try:
+        child_id = invite.get("childId")
+        if not isinstance(child_id, ObjectId):
+            child_id = ObjectId(str(child_id))
+        parent_oid = ObjectId(user.get("id") or user.get("_id"))
+    except Exception:
+        return JSONResponse(content={"error": "Malformed invite"}, status_code=500)
+    database["children"].update_one({"_id": child_id}, {"$set": {"parentId": parent_oid, "updatedAt": datetime.now(timezone.utc)}})
+    database["parent_invites"].update_one({"_id": invite["_id"]}, {"$set": {"used": True, "usedBy": parent_oid, "usedAt": datetime.now(timezone.utc)}})
+    return JSONResponse(content={"ok": True, "childId": str(child_id)})
 
 
 # ============================================================

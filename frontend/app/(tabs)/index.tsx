@@ -294,11 +294,36 @@ function ParentHome() {
               <ChildCard child={c} onAction={onAction} onContact={handleContact} />
             </FadeInUp>
           ))}
-          {children.length === 0 && (
-            <View style={s.emptyCard}>
-              <Ionicons name="person-add" size={30} color="#D1D5DB" />
-              <Text style={s.emptyT}>Дітей не додано</Text>
-            </View>
+          {children.length === 0 && data?.emptyState && (
+            <FadeInUp>
+              <View style={s.emptyCard} testID="parent-empty-state">
+                <View style={s.emptyIconCircle}>
+                  <Ionicons name="person-add" size={32} color="#E30613" />
+                </View>
+                <Text style={s.emptyTitle}>{data.emptyState.title}</Text>
+                <Text style={s.emptySub}>{data.emptyState.subtitle}</Text>
+                <View style={s.emptyActions}>
+                  {(data.emptyState.actions || []).map((a: any, i: number) => (
+                    <PressScale
+                      key={a.action}
+                      testID={`empty-${a.action}`}
+                      style={[s.emptyBtn, a.style === 'primary' ? s.emptyBtnPrimary : s.emptyBtnSecondary] as any}
+                      onPress={() => {
+                        if (a.action === 'add_child') {
+                          router.push('/(tabs)/profile/add-child' as any);
+                        } else if (a.action === 'link_child_by_code') {
+                          router.push('/(tabs)/profile/link-child' as any);
+                        }
+                      }}
+                    >
+                      <Text style={[s.emptyBtnT, a.style === 'primary' ? s.emptyBtnTPrimary : s.emptyBtnTSecondary]}>
+                        {a.label}
+                      </Text>
+                    </PressScale>
+                  ))}
+                </View>
+              </View>
+            </FadeInUp>
           )}
         </View>
 
@@ -401,7 +426,17 @@ const s = StyleSheet.create({
   recReason: { fontSize: 10, color: '#F59E0B', fontWeight: '700', marginTop: 4 },
   recPrice: { fontSize: 15, fontWeight: '900', color: '#0F0F10', marginTop: 6 },
 
-  // Empty
-  emptyCard: { alignItems: 'center', padding: 30, backgroundColor: '#FFF', borderRadius: 14 },
+  // Empty state (no children)
+  emptyCard: { alignItems: 'center', padding: 28, backgroundColor: '#FFF', borderRadius: 18, ...SHADOW_SM },
+  emptyIconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyTitle: { fontSize: 17, fontWeight: '800', color: '#0F0F10' },
+  emptySub: { fontSize: 13, color: '#6B7280', marginTop: 6, textAlign: 'center', lineHeight: 18 },
+  emptyActions: { marginTop: 20, width: '100%' as any, gap: 8 },
+  emptyBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  emptyBtnPrimary: { backgroundColor: '#E30613' },
+  emptyBtnSecondary: { backgroundColor: '#F3F4F6' },
+  emptyBtnT: { fontSize: 14, fontWeight: '800' },
+  emptyBtnTPrimary: { color: '#FFF' },
+  emptyBtnTSecondary: { color: '#0F0F10' },
   emptyT: { color: '#9CA3AF', marginTop: 8, fontSize: 13 },
 });
