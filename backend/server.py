@@ -3177,8 +3177,77 @@ async def get_parent_home_v2(request: Request):
 
     next_payment_date = (now + timedelta(days=30)).strftime("%Y-%m-%d")
 
+    # ---- PRIORITY BLOCK (backend computes the ONE main action) ----
+    # Priority: PAYMENT > ATTENDANCE_RISK > UNCONFIRMED_TODAY > ALL_GOOD
+    priority_block = None
+    if total_debt > 0:
+        # Find the child with largest debt (or first)
+        worst = sorted(finance_per_child, key=lambda c: -c.get("debt", 0))[0] if finance_per_child else None
+        name = worst["childName"] if worst else ""
+        priority_block = {
+            "type": "PAYMENT",
+            "severity": "critical",
+            "icon": "card",
+            "title": f"Борг за {name} — {total_debt} ₴",
+            "subtitle": f"щоб {name.split(' ')[0] if name else 'дитина'} продовжив тренування",
+            "ctaLabel": "Оплатити",
+            "ctaAction": "pay",
+            "ctaPayload": {"childId": worst["childId"] if worst else None, "amount": total_debt},
+            "deadline": next_payment_date,
+        }
+    else:
+        risk_children = [c for c in children_data if c.get("attendance", 100) < 60]
+        unconfirmed_today = [c for c in children_data if c.get("nextTraining") and c.get("status") != "OK"]
+        if risk_children:
+            c = risk_children[0]
+            priority_block = {
+                "type": "ATTENDANCE_RISK",
+                "severity": "warning",
+                "icon": "alert-circle",
+                "title": f"{c['name']} почав рідше відвідувати тренування",
+                "subtitle": f"Відвідуваність {c['attendance']}% — нижче норми",
+                "ctaLabel": "Написати тренеру",
+                "ctaAction": "contact_coach",
+                "ctaPayload": {"childId": c["id"], "coachId": c.get("coachId")},
+            }
+        elif today_schedule:
+            s = today_schedule[0]
+            priority_block = {
+                "type": "CONFIRM_SESSION",
+                "severity": "info",
+                "icon": "checkmark-circle",
+                "title": f"Сьогодні у {s['childName'].split(' ')[0]} тренування о {s['time']}",
+                "subtitle": f"{s.get('location', 'Зал АТАКА')} · {s.get('coach', '')}".strip(" ·"),
+                "ctaLabel": "Переглянути розклад",
+                "ctaAction": "open_schedule",
+                "ctaPayload": {"childId": s["childId"]},
+            }
+        else:
+            priority_block = {
+                "type": "ALL_GOOD",
+                "severity": "success",
+                "icon": "checkmark-done-circle",
+                "title": "Усе добре",
+                "subtitle": "Діти тренуються в нормальному режимі",
+                "ctaLabel": "Переглянути прогрес",
+                "ctaAction": "open_progress",
+                "ctaPayload": {},
+            }
+
+    # ---- CHILD-LEVEL PRIMARY CTA (action inside each card) ----
+    for c in children_data:
+        if c.get("debt", 0) > 0:
+            c["primaryCta"] = {"label": f"Оплатити {c['debt']} ₴", "action": "pay", "payload": {"childId": c["id"], "amount": c["debt"]}}
+        elif c.get("attendance", 100) < 60:
+            c["primaryCta"] = {"label": "Написати тренеру", "action": "contact_coach", "payload": {"coachId": c.get("coachId"), "childId": c["id"]}}
+        elif c.get("nextTraining"):
+            c["primaryCta"] = {"label": "Підтвердити участь", "action": "confirm", "payload": {"childId": c["id"]}}
+        else:
+            c["primaryCta"] = {"label": "Переглянути прогрес", "action": "open_progress", "payload": {"childId": c["id"]}}
+
     return JSONResponse(content=json.loads(json.dumps({
         "parent": {"name": user_name, "id": user_id},
+        "priorityBlock": priority_block,
         "children": children_data,
         "today": today_schedule,
         "alerts": all_alerts,
@@ -3186,6 +3255,7 @@ async def get_parent_home_v2(request: Request):
             "totalDebt": total_debt,
             "nextPaymentDate": next_payment_date,
             "perChild": finance_per_child,
+            "childrenWithDebt": len([c for c in finance_per_child if c.get("debt", 0) > 0]),
         },
         "coachContacts": coach_contacts,
         "competitions": competitions_data,
