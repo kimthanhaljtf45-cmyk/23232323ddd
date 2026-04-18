@@ -22,26 +22,6 @@ export default function HomeScreen() {
   return <ParentHome />;
 }
 
-// ── Header 72 ──────────────────────────────────────────
-function Header({ onBell, onAvatar, unread = 0 }: any) {
-  return (
-    <View style={s.header} testID="parent-header">
-      <View style={s.logoRow}>
-        <View style={s.logoDot} />
-        <Text style={s.logoT}>ATAKA</Text>
-      </View>
-      <View style={{ flex: 1 }} />
-      <PressScale testID="header-bell" style={s.iconBtn as any} onPress={onBell} hitSlop={12}>
-        <Ionicons name="notifications-outline" size={22} color="#0F0F10" />
-        {unread > 0 && <View style={s.bellDot} />}
-      </PressScale>
-      <PressScale testID="header-avatar" style={s.avatar as any} onPress={onAvatar} hitSlop={12}>
-        <Ionicons name="person" size={18} color="#FFF" />
-      </PressScale>
-    </View>
-  );
-}
-
 // ── Priority Block — ONE main action ──────────────────
 function PriorityBlock({ block, onAction }: any) {
   if (!block) return null;
@@ -297,7 +277,6 @@ function ParentHome() {
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
       <Toast visible={toast.visible} text={toast.text} tone={toast.tone} icon={toast.icon} onHide={() => setToast({ visible: false, text: '' })} />
-      <Header unread={unreadAlerts} onBell={() => router.push('/(tabs)/feed' as any)} onAvatar={() => router.push('/(tabs)/profile' as any)} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} tintColor="#E30613" />}
@@ -358,21 +337,6 @@ const SHADOW_SM = {
 
 const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
-
-  // Header 72
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingTop: 48,
-    height: 72 + 48, backgroundColor: '#FFF',
-    borderBottomWidth: 1, borderBottomColor: '#F1F1F4',
-    gap: 10,
-  },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E30613' },
-  logoT: { fontSize: 18, fontWeight: '900', color: '#0F0F10', letterSpacing: 2 },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  bellDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E30613' },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E30613', alignItems: 'center', justifyContent: 'center' },
 
   // Priority card (big CTA, solid color)
   priorityCard: {
