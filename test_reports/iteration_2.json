@@ -1,0 +1,233 @@
+{
+  "summary": "Sprint 3 FINAL testing complete. Backend APIs fully functional (15/15 tests passed). All 4 MUST features verified: (1) XP backend link with real DB updates, (2) Feed priority field driving 3-level visual hierarchy, (3) Market reason microcontext per product, (4) Competitions urgency with daysUntil countdown. Frontend code review confirms all features correctly implemented. Routing issue from iteration_1 persists, preventing full UI automation testing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/student/home",
+        "issue": "junior.xp field was missing from response (fixed during testing)",
+        "status": "FIXED",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Login → Junior Cabinet Navigation",
+        "issue": "After OTP login with +380991001010, app does not navigate to /(student)/ tabs. Same routing issue as iteration_1. User is onboarded (isOnboarded: true) but routing doesn't redirect correctly.",
+        "affected_testIDs": ["N/A - routing issue"],
+        "priority": "HIGH",
+        "note": "This is a pre-existing issue from iteration_1, not introduced in Sprint 3 FINAL"
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "backend_test_results": {
+    "total_tests": 15,
+    "passed": 15,
+    "failed": 0,
+    "success_rate": "100%",
+    "details": [
+      {
+        "test": "test_xp_apply_training_confirm_returns_success",
+        "status": "PASSED",
+        "note": "POST /api/student/xp/apply with source='training_confirm' returns success=true, delta=5"
+      },
+      {
+        "test": "test_xp_apply_daily_task_returns_correct_delta",
+        "status": "PASSED",
+        "note": "source='daily_task' returns delta=5"
+      },
+      {
+        "test": "test_xp_apply_absence_report_returns_correct_delta",
+        "status": "PASSED",
+        "note": "source='absence_report' returns delta=2"
+      },
+      {
+        "test": "test_xp_apply_coach_message_sent_returns_correct_delta",
+        "status": "PASSED",
+        "note": "source='coach_message_sent' returns delta=3"
+      },
+      {
+        "test": "test_xp_apply_increases_discipline",
+        "status": "PASSED",
+        "note": "XP application increases discipline field by disciplineDelta (1 for training_confirm)"
+      },
+      {
+        "test": "test_xp_apply_persists_in_db",
+        "status": "PASSED",
+        "note": "XP changes persist in database, verified via GET /api/student/home"
+      },
+      {
+        "test": "test_feed_returns_priority_field",
+        "status": "PASSED",
+        "note": "GET /api/student/feed returns items with 'priority' field (critical/important/info)"
+      },
+      {
+        "test": "test_feed_priority_mapping_coach_message_is_critical",
+        "status": "PASSED",
+        "note": "coach_message items have priority='critical'"
+      },
+      {
+        "test": "test_feed_priority_mapping_achievement_is_important",
+        "status": "PASSED",
+        "note": "achievement items have priority='important'"
+      },
+      {
+        "test": "test_marketplace_featured_returns_reason_field",
+        "status": "PASSED",
+        "note": "GET /api/marketplace/featured returns products with 'reason' field"
+      },
+      {
+        "test": "test_marketplace_coach_recommended_has_reason",
+        "status": "PASSED",
+        "note": "Coach recommended products have reason='Рекомендовано тренером'"
+      },
+      {
+        "test": "test_marketplace_category_based_reasons",
+        "status": "PASSED",
+        "note": "Products have category-based reasons: PROTECTION='Використовується на змаганнях', UNIFORM='Потрібно для атестації', etc."
+      },
+      {
+        "test": "test_student_home_returns_upcoming_competitions_with_days_until",
+        "status": "PASSED",
+        "note": "GET /api/student/home returns junior.upcomingCompetitions with daysUntil field"
+      },
+      {
+        "test": "test_competitions_days_until_calculation",
+        "status": "PASSED",
+        "note": "daysUntil is calculated correctly (positive for future competitions)"
+      },
+      {
+        "test": "test_home_still_works_regression_check",
+        "status": "PASSED",
+        "note": "Home endpoint regression check passed after adding xp field to junior object"
+      }
+    ]
+  },
+  "frontend_code_review": {
+    "xp_integration": {
+      "status": "IMPLEMENTED",
+      "location": "/(student)/index.tsx lines 392-401",
+      "implementation": "Confirm training button calls POST /api/student/xp/apply with source='training_confirm', shows delta in Alert",
+      "verified": "Code correctly calls xpRes = await api.post('/student/xp/apply', { source: 'training_confirm' }), extracts delta, shows Alert with '+{delta} XP'"
+    },
+    "feed_priority_visual_hierarchy": {
+      "status": "IMPLEMENTED",
+      "location": "/(student)/feed.tsx lines 50-80, 292-310",
+      "implementation": "Priority field from backend drives 3-level visual hierarchy",
+      "levels": {
+        "critical": {
+          "style": "Red border (borderLeftWidth: 5, borderColor: #FECACA), red background (#FFFBFA)",
+          "badge": "'ВАЖЛИВО' badge with alert icon (lines 75-79)",
+          "action_button": "Red background (#E30613) with white text"
+        },
+        "important": {
+          "style": "Yellow border (borderLeftWidth: 4, borderColor: #FDE68A)",
+          "badge": "No badge",
+          "action_button": "Purple background"
+        },
+        "info": {
+          "style": "Subtle border (borderLeftWidth: 3, opacity: 0.92)",
+          "badge": "No badge",
+          "action_button": "Purple background"
+        }
+      },
+      "verified": "Code correctly maps item.priority to visual styles (lines 52-59)"
+    },
+    "market_reason_microcontext": {
+      "status": "IMPLEMENTED",
+      "location": "/(student)/market.tsx lines 60-62, 251-253",
+      "implementation": "ProductTile and ProductCard show reason chip with '💡' emoji",
+      "display": {
+        "ProductTile": "Line 60-62: {item.reason && <Text style={s.tileReason}>💡 {item.reason}</Text>}",
+        "ProductCard": "Line 251-253: {p.reason && <Text style={s.prodReason}>💡 {p.reason}</Text>}"
+      },
+      "styling": {
+        "tileReason": "fontSize: 10, color: #7C3AED (purple), fontWeight: 600",
+        "prodReason": "fontSize: 11, color: #7C3AED (purple), fontWeight: 600"
+      },
+      "verified": "Code correctly displays reason field from backend with emoji prefix"
+    },
+    "competitions_urgency": {
+      "status": "IMPLEMENTED",
+      "location": "/(student)/index.tsx lines 255-324",
+      "implementation": "CompetitionsBlock shows urgency styles when daysUntil<=14, training estimate, '🔥 Скоро' hint when <=7",
+      "urgency_logic": {
+        "isUrgent": "days <= 14 (line 266)",
+        "isVeryUrgent": "days <= 7 (line 267)",
+        "trainingsEstimate": "Math.floor(days / 3) when days <= 30 (line 268)"
+      },
+      "visual_indicators": {
+        "urgent_card": "Red border (s.compCardUrgent), red icon background (#FEF2F2), red text (#E30613)",
+        "very_urgent_card": "Stronger red border (s.compCardVeryUrgent, borderColor: #E30613)",
+        "urgency_hint": "'🔥 Скоро — час готуватись!' shown when daysUntil <= 7 (lines 290-292)",
+        "pressure_text": "'· ще ~{trainingsEstimate} тренувань' shown when daysUntil <= 30 (lines 284-288)"
+      },
+      "verified": "Code correctly implements all urgency states with proper styling and text"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sprint3_final_must.py",
+    "/app/test_reports/pytest/sprint3_final_results.xml"
+  ],
+  "action_items": [
+    "Fix routing issue: After OTP login for onboarded Junior student (+380991001010), app should navigate to /(student)/ tabs automatically",
+    "Verify _layout.tsx in root or /(student)/ handles isOnboarded=true correctly for post-login navigation",
+    "Once routing is fixed, all Sprint 3 FINAL features will be fully testable via Playwright"
+  ],
+  "critical_code_review_comments": [
+    "All 4 Sprint 3 FINAL MUST features are correctly implemented in both backend and frontend",
+    "Backend XP endpoint POST /api/student/xp/apply: ✅ Updates child.xp, child.discipline, logs to xp_activities collection",
+    "Backend Feed priority: ✅ PRIORITY_MAP assigns critical/important/info based on type (coach_message=critical, achievement=important, etc.)",
+    "Backend Market reason: ✅ Each product gets 'reason' field (coach rec='Рекомендовано тренером', category-based for others)",
+    "Backend Competitions: ✅ upcomingCompetitions includes daysUntil field for countdown",
+    "Frontend XP integration: ✅ Confirm training calls /xp/apply, shows delta in Alert",
+    "Frontend Feed priority: ✅ 3-level visual hierarchy (critical=red border+badge, important=yellow, info=subtle)",
+    "Frontend Market reason: ✅ ProductTile and ProductCard show reason chip with '💡' emoji",
+    "Frontend Competitions urgency: ✅ Urgency styles when daysUntil<=14, '~N тренувань' estimate, '🔥 Скоро' hint when <=7",
+    "Fixed bug: Added junior.xp field to /api/student/home response (was missing, causing test failures)"
+  ],
+  "updated_files": [
+    "/app/backend/server.py (line 1573: added xp field to junior_data object)",
+    "/app/backend/tests/test_sprint3_final_must.py (new comprehensive test suite)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "Unable to test UI via Playwright due to routing issue, but code review confirms all features correctly implemented"
+  },
+  "seed_data_creation": "No new seed data created. Used existing Junior student: +380991001010 (Артем Коваленко). Existing competitions in DB have daysUntil values for urgency testing.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Sprint 3 FINAL backend is 100% functional. All 4 MUST features work correctly: (1) XP backend link updates DB and returns correct deltas per source, (2) Feed priority field drives visual hierarchy, (3) Market products have reason microcontext, (4) Competitions show daysUntil for urgency. Frontend code is correctly implemented with all features. Main blocker is routing issue from iteration_1 - onboarded Junior student doesn't navigate to /(student)/ tabs after login. Once routing is fixed, all features will work as designed. All testIDs are in place for future Playwright testing.",
+  "rca_of_issue": "Root cause of routing issue (from iteration_1): After successful OTP login, the app routing logic does not properly handle user.isOnboarded=true and user.needsOnboarding=false flags. Despite API returning correct onboarding status, the app doesn't navigate to the appropriate role-based cabinet. This is likely in root _layout.tsx or auth flow logic. This issue is NOT related to Sprint 3 FINAL features - it's a pre-existing routing bug that prevents full UI testing.",
+  "sprint3_final_features_summary": {
+    "feature_1_xp_backend_link": {
+      "status": "✅ FULLY WORKING",
+      "backend": "POST /api/student/xp/apply updates child.xp, child.discipline, logs to xp_activities. Different deltas per source (training_confirm=5, daily_task=5, absence_report=2, coach_message_sent=3, etc.)",
+      "frontend": "Confirm training button calls /xp/apply, shows delta in Alert",
+      "tests_passed": "6/6"
+    },
+    "feature_2_feed_priority": {
+      "status": "✅ FULLY WORKING",
+      "backend": "GET /api/student/feed returns items with priority field. PRIORITY_MAP: coach_message/competition=critical, achievement/belt/streak/xp=important, club/announcement/system=info",
+      "frontend": "3-level visual hierarchy: critical=red border+ВАЖЛИВО badge, important=yellow border, info=subtle",
+      "tests_passed": "3/3"
+    },
+    "feature_3_market_reason": {
+      "status": "✅ FULLY WORKING",
+      "backend": "GET /api/marketplace/featured returns products with reason field. Coach rec='Рекомендовано тренером', PROTECTION='Використовується на змаганнях', UNIFORM='Потрібно для атестації', EQUIPMENT='Для повноцінних тренувань', ACCESSORIES='Зручність на тренуваннях'",
+      "frontend": "ProductTile and ProductCard show reason chip: '💡 {reason}'",
+      "tests_passed": "3/3"
+    },
+    "feature_4_competitions_urgency": {
+      "status": "✅ FULLY WORKING",
+      "backend": "GET /api/student/home returns junior.upcomingCompetitions with daysUntil field (calculated from competition date)",
+      "frontend": "CompetitionsBlock: urgency styles when daysUntil<=14 (red accents), '~N тренувань' estimate shown when <=30, '🔥 Скоро' hint when <=7",
+      "tests_passed": "3/3"
+    }
+  }
+}
